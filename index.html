@@ -185,7 +185,8 @@ body{background-color:#f9f9fd}
 const $ = id => document.getElementById(id);
 const STORE_KEY = 'technopars_light_cinematic_v1';
 const GH_KEY = 'technopars_gh_config';
-// Public static deployment: client-side admin access is disabled for security.
+// Admin UI is local-only; it is not authentication.
+const DEFAULT_GH_CONFIG={repo:'parsanaderi8183-rgb/-',branch:'main'};
 
 const LOGO_URL = 'https://up.20script.ir/file/4309-IMG-20261117-155251-531.jpg';
 
@@ -229,7 +230,7 @@ function normalize(saved){
  const result={...clone(SEED),...saved};
  // Repair legacy blank arrays: older releases saved empty arrays that erased the seeded content.
  for(const key of ['projects','lessons','downloads','websites']){
-   if(!Array.isArray(result[key]) || result[key].length===0) result[key]=clone(SEED[key]);
+   if(!Array.isArray(result[key])) result[key]=clone(SEED[key]);
  }
  if(!Array.isArray(result.social)) result.social=[];
  result.contact={...SEED.contact,...(saved.contact||{})};
@@ -324,7 +325,7 @@ function renderAdminLists(){
   }));
   box.querySelectorAll('[data-delete]').forEach(btn=>btn.addEventListener('click',()=>{
    const index=Number(btn.dataset.delete.split(':')[1]);
-   if(confirm('این مورد حذف شود؟')){state[type].splice(index,1);edits[type]=null;saveLocal();}
+   if(confirm('این مورد حذف شود؟')){state[type].splice(index,1);if(edits[type]===index)resetForm(type);else if(edits[type]!==null&&edits[type]>index)edits[type]--;saveLocal();}
   }));
  }
 }
@@ -358,9 +359,10 @@ function fillSettings(){
 }
 function bindSettings(){
  $('saveSettings').addEventListener('click',()=>{
-  for(const [id,key] of [['setBrand','brand'],['setBadge','badge'],['setTitle','title'],['setHeroDesc','heroDesc'],['setAbout','aboutDesc'],['setContact','contactText'],['setLogo','logo']])state[key]=$(id).value.trim();
-  if(state.logo&&!isUrl(state.logo)){notify('آدرس لوگو معتبر نیست');return}
-  saveLocal();
+  const draft={};
+  for(const [id,key] of [['setBrand','brand'],['setBadge','badge'],['setTitle','title'],['setHeroDesc','heroDesc'],['setAbout','aboutDesc'],['setContact','contactText'],['setLogo','logo']])draft[key]=$(id).value.trim();
+  if(draft.logo&&!isUrl(draft.logo)){notify('آدرس لوگو معتبر نیست');return}
+  Object.assign(state,draft);saveLocal();
  });
  $('resetSettings').addEventListener('click',()=>{if(confirm('متن‌های پیش‌فرض جایگزین شوند؟')){for(const key of ['brand','badge','title','heroDesc','aboutDesc','contactText','logo'])state[key]=SEED[key];fillSettings();saveLocal()}});
  $('saveContact').addEventListener('click',()=>{state.contact={email:$('cEmail').value.trim(),telegram:$('cTelegram').value.trim(),instagram:$('cInstagram').value.trim(),github:$('cGithub').value.trim(),other:$('cOther').value.trim()};saveLocal()});
@@ -379,17 +381,22 @@ function enterAdmin(){
 }
 function openAdmin(){enterAdmin()}
 function bindAdminAccess(){
- // Hidden local admin shortcut: click the brand/logo five times within 2.5 seconds.
- // This is NOT authentication; publishing still requires a GitHub token entered at publish time.
- const trigger=$('adminTrigger');if(!trigger)return;
- trigger.setAttribute('aria-label','TechnoPars home');
- trigger.addEventListener('click',e=>{
-  adminTapCount++;
-  clearTimeout(adminTapTimer);
-  if(adminTapCount>=5){e.preventDefault();adminTapCount=0;enterAdmin();return;}
-  adminTapTimer=setTimeout(()=>{adminTapCount=0},2500);
- });
+ const trigger=$('adminTrigger');
+ if(trigger){
+  trigger.setAttribute('aria-label','TechnoPars home — five taps to open local admin');
+  trigger.addEventListener('click',e=>{
+   e.preventDefault();adminTapCount++;clearTimeout(adminTapTimer);
+   if(adminTapCount>=5){adminTapCount=0;enterAdmin();return}
+   adminTapTimer=setTimeout(()=>{adminTapCount=0},2500);
+  });
+ }
+ document.querySelectorAll('.side-btn[data-panel]').forEach(btn=>btn.addEventListener('click',()=>navAdmin(btn.dataset.panel)));
+ document.querySelectorAll('[data-go]').forEach(btn=>btn.addEventListener('click',()=>navAdmin(btn.dataset.go)));
+ $('adminClose')?.addEventListener('click',closeAdmin);
+ $('admin')?.addEventListener('click',e=>{if(e.target===$('admin'))closeAdmin()});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('admin')?.classList.contains('open'))closeAdmin()});
 }
+function closeAdmin(){$('admin')?.classList.remove('open');clearTimeout(adminTapTimer);adminTapCount=0}
 
 function downloadJSON(value,filename){
  const blob=new Blob([JSON.stringify(value,null,2)],{type:'application/json'});
@@ -406,7 +413,8 @@ function bindBackup(){
  $('clearData').addEventListener('click',()=>{if(confirm('اطلاعات مدیریتی پاک و داده‌های پیش‌فرض بازگردانی شود؟')){state=clone(SEED);saveLocal();fillSettings()}});
 }
 function githubConfig(){
- try{return JSON.parse(localStorage.getItem(GH_KEY)||'{}')}catch{return {}}
+ try{const saved=JSON.parse(localStorage.getItem(GH_KEY)||'{}');return {repo:saved.repo||DEFAULT_GH_CONFIG.repo,branch:saved.branch||DEFAULT_GH_CONFIG.branch}}
+ catch{return {...DEFAULT_GH_CONFIG}}
 }
 function bindPublisher(){
  const cfg=githubConfig();$('ghRepo').value=cfg.repo||'';$('ghBranch').value=cfg.branch||'main';
@@ -435,7 +443,7 @@ function bindPublisher(){
 }
 async function loadPublishedContent(){
  // Visitor pages use the public raw JSON when the repository is configured.
- const cfg=githubConfig();if(!cfg.repo)return;
+ const cfg=githubConfig();
  try{
   const url=`https://raw.githubusercontent.com/${cfg.repo}/${encodeURIComponent(cfg.branch||'main')}/technopars-content.json`;
   const response=await fetch(url,{cache:'no-store'});if(!response.ok)return;
