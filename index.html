@@ -385,8 +385,8 @@ function bindAdminAccess(){
  if(trigger){
   trigger.setAttribute('aria-label','TechnoPars home — five taps to open local admin');
   trigger.addEventListener('click',e=>{
-   e.preventDefault();adminTapCount++;clearTimeout(adminTapTimer);
-   if(adminTapCount>=5){adminTapCount=0;enterAdmin();return}
+   adminTapCount++;clearTimeout(adminTapTimer);
+   if(adminTapCount>=5){e.preventDefault();adminTapCount=0;enterAdmin();return}
    adminTapTimer=setTimeout(()=>{adminTapCount=0},2500);
   });
  }
