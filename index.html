@@ -374,28 +374,21 @@ function navAdmin(panel){
  $('panelTitle').textContent=titles[panel]||panel;
  const main=document.querySelector('.adminmain');if(main)main.scrollTop=0;
 }
-function showAdminLogin(){
- let modal=$('adminLogin');
- if(!modal){
-  modal=document.createElement('div');modal.id='adminLogin';modal.className='admin-login';
-  modal.innerHTML='<div class="admin-login-box"><div class="login-mark">✦</div><h2>ورود به مدیریت</h2><p>رمز عبور پنل تکنوپارس را وارد کنید.</p><form id="adminLoginForm"><input id="adminPass" type="password" autocomplete="current-password" placeholder="رمز عبور" aria-label="رمز عبور"><button class="adm-btn dark" type="submit">ورود به پنل</button><button class="adm-btn" id="adminLoginCancel" type="button">انصراف</button><small id="adminLoginError" role="alert"></small></form></div>';
-  document.body.appendChild(modal);
-  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove()});
-  $('adminLoginCancel').addEventListener('click',()=>modal.remove());
-  $('adminLoginForm').addEventListener('submit',e=>{
-   e.preventDefault();
-   if(false){modal.remove();enterAdmin();}
-   else{$('adminLoginError').textContent='رمز واردشده صحیح نیست.';$('adminPass').value='';$('adminPass').focus();}
-  });
- }
- modal.style.display='flex';setTimeout(()=>$('adminPass')?.focus(),80);
-}
 function enterAdmin(){
  $('admin').classList.add('open');fillSettings();renderAdminLists();navAdmin('dashboard');
 }
-function openAdmin(){showAdminLogin()}
+function openAdmin(){enterAdmin()}
 function bindAdminAccess(){
- // Public deployment: admin entry points are disabled.
+ // Hidden local admin shortcut: click the brand/logo five times within 2.5 seconds.
+ // This is NOT authentication; publishing still requires a GitHub token entered at publish time.
+ const trigger=$('adminTrigger');if(!trigger)return;
+ trigger.setAttribute('aria-label','TechnoPars home');
+ trigger.addEventListener('click',e=>{
+  adminTapCount++;
+  clearTimeout(adminTapTimer);
+  if(adminTapCount>=5){e.preventDefault();adminTapCount=0;enterAdmin();return;}
+  adminTapTimer=setTimeout(()=>{adminTapCount=0},2500);
+ });
 }
 
 function downloadJSON(value,filename){
